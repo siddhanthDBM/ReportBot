@@ -62,6 +62,7 @@ $Form.Controls.Add($HintLabel)
 
 $TextBox = New-Object System.Windows.Forms.TextBox
 $TextBox.Multiline = $true
+$TextBox.AcceptsReturn = $true
 $TextBox.ScrollBars = 'Vertical'
 $TextBox.Font = New-Object System.Drawing.Font('Segoe UI', 10.5)
 $TextBox.Location = New-Object System.Drawing.Point(20, 114)
@@ -103,7 +104,7 @@ if ($Result -ne [System.Windows.Forms.DialogResult]::OK -or [string]::IsNullOrWh
     exit
 }
 
-$Lines = $TextBox.Text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+$Lines = @($TextBox.Text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
 
 # ---------- Load / create this week's data file ----------
 if (Test-Path $DataFile) {
@@ -118,7 +119,29 @@ if (Test-Path $DataFile) {
 
 $Json.days | Add-Member -NotePropertyName $DayName -NotePropertyValue $Lines -Force
 
-$Json | ConvertTo-Json -Depth 6 | Set-Content -Path $DataFile -Encoding UTF8
+# ---------- Write JSON by hand ----------
+# ConvertTo-Json in Windows PowerShell 5.1 silently collapses single-element
+# arrays into a bare scalar, which corrupts day entries with only one line.
+# Wrapping every day's value in @() here and serializing manually avoids that.
+function ConvertTo-JsonString([string]$Text) {
+    $escaped = $Text -replace '\\', '\\\\' -replace '"', '\"' -replace "`t", '\t'
+    return '"' + $escaped + '"'
+}
+
+$dayBlocks = foreach ($dayKey in $Json.days.PSObject.Properties.Name) {
+    $itemsArray = @($Json.days.$dayKey)
+    $itemsJson = ($itemsArray | ForEach-Object { ConvertTo-JsonString $_ }) -join ",`n      "
+    "    " + (ConvertTo-JsonString $dayKey) + ": [`n      " + $itemsJson + "`n    ]"
+}
+
+$finalJson = "{`n" +
+    "  " + (ConvertTo-JsonString 'weekStart') + ": " + (ConvertTo-JsonString $Json.weekStart) + ",`n" +
+    "  " + (ConvertTo-JsonString 'weekEnd') + ": " + (ConvertTo-JsonString $Json.weekEnd) + ",`n" +
+    "  " + (ConvertTo-JsonString 'days') + ": {`n" + ($dayBlocks -join ",`n") + "`n  }`n" +
+    "}`n"
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($DataFile, $finalJson, $Utf8NoBom)
 
 # ---------- Friday: generate the PDF ----------
 if ($DayName -eq 'Friday') {

@@ -7,7 +7,7 @@ function loadEnv() {
   const envPath = path.join(__dirname, '.env');
   const env = {};
   if (fs.existsSync(envPath)) {
-    for (const line of fs.readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
+    for (const line of fs.readFileSync(envPath, 'utf-8').replace(/^﻿/, '').split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
       const idx = trimmed.indexOf('=');

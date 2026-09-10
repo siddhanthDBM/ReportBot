@@ -127,10 +127,11 @@ $Config = [PSCustomObject]@{
     authorName  = $NameBox.Text.Trim()
     authorTitle = $TitleBox.Text.Trim()
 }
-$Config | ConvertTo-Json | Set-Content -Path $ConfigFile -Encoding UTF8
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($ConfigFile, ($Config | ConvertTo-Json), $Utf8NoBom)
 
 if (-not [string]::IsNullOrWhiteSpace($KeyBox.Text)) {
-    "OPENROUTER_API_KEY=$($KeyBox.Text.Trim())" | Set-Content -Path $EnvFile -Encoding UTF8
+    [System.IO.File]::WriteAllText($EnvFile, "OPENROUTER_API_KEY=$($KeyBox.Text.Trim())`n", $Utf8NoBom)
 }
 
 if ($RegisterCheck.Checked) {

@@ -16,7 +16,7 @@ function loadConfig() {
     console.error('config.json not found. Run setup.ps1 first to enter your name and title.');
     process.exit(1);
   }
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8').replace(/^﻿/, ''));
   if (!config.authorName || !config.authorTitle) {
     console.error('config.json is missing authorName/authorTitle. Run setup.ps1 to fix it.');
     process.exit(1);
@@ -76,10 +76,19 @@ function drawFooter(doc, pageNum) {
     .text(`Page ${pageNum}`, 0, pageHeight - 42, { align: 'right', width: pageWidth - marginX });
 }
 
+function normalizeDays(rawDays) {
+  const normalized = {};
+  for (const [key, value] of Object.entries(rawDays)) {
+    normalized[key] = Array.isArray(value) ? value : [value];
+  }
+  return normalized;
+}
+
 async function generateReport(dataPath) {
-  const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+  const raw = fs.readFileSync(dataPath, 'utf-8').replace(/^﻿/, '');
+  const data = JSON.parse(raw);
   const { weekStart, weekEnd } = data;
-  const days = await rephraseWeek(data.days, AUTHOR_NAME);
+  const days = await rephraseWeek(normalizeDays(data.days), AUTHOR_NAME);
 
   const outDir = path.join(__dirname, 'Weekly Reports', `Week of ${weekStart}`);
   fs.mkdirSync(outDir, { recursive: true });
